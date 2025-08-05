@@ -8,6 +8,13 @@ interface ShowCardProps {
   className?: string;
 }
 
+function slugify(str: string) {
+  return str
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 const ShowCard = ({ show, className = '' }: ShowCardProps) => {
   const imageUrl = show.poster_path 
     ? `https://image.tmdb.org/t/p/w500${show.poster_path}`
@@ -15,7 +22,7 @@ const ShowCard = ({ show, className = '' }: ShowCardProps) => {
 
   return (
     <BackgroundGradient className="rounded-3xl max-w-xs p-4 sm:p-6 bg-white dark:bg-zinc-900 flex flex-col h-full" containerClassName={className}>
-      <Link to={`/show/${show.id}`} className="group flex flex-col h-full">
+      <Link to={`/show/${show.id}-${slugify(show.name)}`} className="group flex flex-col h-full">
         <div className="relative overflow-hidden rounded-2xl shadow-lg">
           <img
             src={imageUrl}
@@ -27,7 +34,9 @@ const ShowCard = ({ show, className = '' }: ShowCardProps) => {
           <div className="absolute top-3 right-3 bg-black/70 backdrop-blur-sm rounded-full px-2 py-1 flex items-center space-x-1">
             <Star className="h-3 w-3 text-yellow-400 fill-current" />
             <span className="text-white text-xs font-medium">
-              {show.vote_average.toFixed(1)}
+              {typeof show.vote_average === 'number' && !isNaN(show.vote_average)
+                ? show.vote_average.toFixed(1)
+                : 'N/A'}
             </span>
           </div>
         </div>
@@ -45,7 +54,7 @@ const ShowCard = ({ show, className = '' }: ShowCardProps) => {
               <Calendar className="h-3 w-3" />
               <span>{show.first_air_date ? new Date(show.first_air_date).getFullYear() : '-'}</span>
             </div>
-            {show.origin_country.length > 0 && (
+            {Array.isArray(show.origin_country) && show.origin_country.length > 0 && (
               <div className="flex items-center space-x-1">
                 <MapPin className="h-3 w-3" />
                 <span>{show.origin_country[0]}</span>

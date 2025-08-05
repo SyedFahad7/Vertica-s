@@ -1,15 +1,28 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Show } from '../types';
 import ShowCard from '../components/ShowCard';
 import { Search as SearchIcon, SlidersHorizontal, X } from 'lucide-react';
 
 const Search: React.FC = () => {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialQuery = searchParams.get('q') || '';
+  const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [shows, setShows] = useState<Show[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState('popularity');
   const [showFilters, setShowFilters] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Keep URL in sync with searchQuery
+  useEffect(() => {
+    if (searchQuery) {
+      setSearchParams({ q: searchQuery });
+    } else {
+      setSearchParams({});
+    }
+  }, [searchQuery, setSearchParams]);
 
   useEffect(() => {
     if (!searchQuery.trim()) {
@@ -23,6 +36,12 @@ const Search: React.FC = () => {
         try {
           const apiKey = import.meta.env.VITE_TMDB_API_KEY;
           const res = await fetch(`https://api.themoviedb.org/3/search/tv?api_key=${apiKey}&query=${encodeURIComponent(searchQuery)}`);
+          if (!res.ok) {
+            if (res.status === 429) {
+              throw new Error('API quota exceeded. Please try again later.');
+            }
+            throw new Error('Failed to fetch search results from TMDB.');
+          }
           const data = await res.json();
           const shows: Show[] = (data.results || []).map((item: any) => ({
             id: item.id,
@@ -46,8 +65,8 @@ const Search: React.FC = () => {
             created_by: [],
           }));
           setShows(shows);
-        } catch (err) {
-          setError('Failed to fetch search results from TMDB.');
+        } catch (err: any) {
+          setError(err.message || 'Failed to fetch search results from TMDB.');
         } finally {
           setLoading(false);
         }
@@ -59,7 +78,6 @@ const Search: React.FC = () => {
 
   const filteredAndSortedShows = useMemo(() => {
     let filtered = shows;
-    // Sort results
     filtered.sort((a, b) => {
       switch (sortBy) {
         case 'name':
@@ -76,6 +94,14 @@ const Search: React.FC = () => {
     return filtered;
   }, [shows, sortBy]);
 
+  // Keyboard accessibility: Escape clears input, Enter submits
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape') {
+      setSearchQuery('');
+      inputRef.current?.blur();
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 pt-8">
       <div className="container mx-auto px-4">
@@ -86,13 +112,29 @@ const Search: React.FC = () => {
           <form onSubmit={e => e.preventDefault()} className="mb-6">
             <div className="relative max-w-2xl">
               <input
+                ref={inputRef}
                 type="text"
                 placeholder="Search for TV shows..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
+                onKeyDown={handleKeyDown}
+                className="w-full pl-12 pr-10 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
+                aria-label="Search for TV shows"
               />
               <SearchIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    inputRef.current?.focus();
+                  }}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 h-6 w-6 text-gray-400 hover:text-gray-600 focus:outline-none"
+                  aria-label="Clear search"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              )}
             </div>
           </form>
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -109,6 +151,7 @@ const Search: React.FC = () => {
                 value={sortBy}
                 onChange={e => setSortBy(e.target.value)}
                 className="px-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                aria-label="Sort shows"
               >
                 <option value="popularity">Sort by Popularity</option>
                 <option value="name">Sort by Name</option>

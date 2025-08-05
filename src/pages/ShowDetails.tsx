@@ -1,20 +1,23 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Show, Season, Episode, Network, Creator } from '../types';
-import { Star, Calendar, MapPin, Clock, Users, ArrowLeft, Play, Heart } from 'lucide-react';
+import { Star, Calendar, MapPin, Users, ArrowLeft, Play, Heart } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p';
 
 const ShowDetails: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  const { slug } = useParams<{ slug: string }>();
+  const id = slug ? parseInt(slug.split('-')[0], 10) : undefined;
   const [show, setShow] = useState<Show | null>(null);
   const [selectedSeason, setSelectedSeason] = useState<Season | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [inWatchlist, setInWatchlist] = useState(false);
 
   useEffect(() => {
     const fetchShowDetails = async () => {
+      if (!id) return;
       setLoading(true);
       setError(null);
       try {
@@ -112,6 +115,23 @@ const ShowDetails: React.FC = () => {
     if (show && selectedSeason) fetchSeasonEpisodes();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show, selectedSeason?.season_number]);
+
+  useEffect(() => {
+    if (!show) return;
+    const list = JSON.parse(localStorage.getItem('watchlist') || '[]');
+    setInWatchlist(list.some((s: any) => s.id === show.id));
+  }, [show]);
+  const handleWatchlist = () => {
+    if (!show) return;
+    let list = JSON.parse(localStorage.getItem('watchlist') || '[]');
+    if (inWatchlist) {
+      list = list.filter((s: any) => s.id !== show.id);
+    } else {
+      list.push({ id: show.id, name: show.name, poster_path: show.poster_path, first_air_date: show.first_air_date, overview: show.overview });
+    }
+    localStorage.setItem('watchlist', JSON.stringify(list));
+    setInWatchlist(!inWatchlist);
+  };
 
   if (loading) {
     return (
@@ -226,9 +246,10 @@ const ShowDetails: React.FC = () => {
                   <span>Watch Trailer</span>
                 </button>
                 
-                <button className="border-2 border-white text-white hover:bg-white hover:text-gray-900 px-6 py-3 rounded-lg font-semibold flex items-center space-x-2 transition-colors duration-200">
+                <button className={`border-2 ${inWatchlist ? 'border-red-600 bg-red-600 text-white' : 'border-white text-white hover:bg-white hover:text-gray-900'} px-6 py-3 rounded-lg font-semibold flex items-center space-x-2 transition-colors duration-200`}
+                  onClick={handleWatchlist}>
                   <Heart className="h-5 w-5" />
-                  <span>Add to Watchlist</span>
+                  <span>{inWatchlist ? 'Remove from Watchlist' : 'Add to Watchlist'}</span>
                 </button>
               </div>
               
@@ -291,26 +312,22 @@ const ShowDetails: React.FC = () => {
                   alt={selectedSeason.name}
                   className="w-48 h-72 object-cover rounded-lg mx-auto md:mx-0"
                 />
-                
                 <div className="flex-1">
                   <h3 className="text-2xl font-bold text-gray-900 mb-2">
                     {selectedSeason.name}
                   </h3>
                   <p className="text-gray-600 mb-4">{selectedSeason.overview}</p>
-                  
                   <div className="flex flex-wrap gap-4 text-sm text-gray-500">
                     <div className="flex items-center space-x-1">
                       <Calendar className="h-4 w-4" />
                       <span>{new Date(selectedSeason.air_date).getFullYear()}</span>
                     </div>
                     <div className="flex items-center space-x-1">
-                      <Clock className="h-4 w-4" />
                       <span>{selectedSeason.episode_count} episodes</span>
                     </div>
                   </div>
                 </div>
               </div>
-              
               {selectedSeason.episodes.length > 0 && (
                 <div className="space-y-4">
                   <h4 className="text-xl font-semibold text-gray-900">Episodes</h4>
@@ -320,18 +337,15 @@ const ShowDetails: React.FC = () => {
                         <div className="flex-shrink-0 w-16 h-16 bg-blue-600 text-white rounded-lg flex items-center justify-center font-bold">
                           {episode.episode_number}
                         </div>
-                        
                         <div className="flex-1">
                           <h5 className="font-semibold text-gray-900 mb-1">{episode.name}</h5>
                           <p className="text-gray-600 text-sm mb-2 line-clamp-2">{episode.overview}</p>
-                          
                           <div className="flex items-center gap-4 text-xs text-gray-500">
                             <div className="flex items-center space-x-1">
                               <Calendar className="h-3 w-3" />
                               <span>{new Date(episode.air_date).toLocaleDateString()}</span>
                             </div>
                             <div className="flex items-center space-x-1">
-                              <Clock className="h-3 w-3" />
                               <span>{episode.runtime} min</span>
                             </div>
                             <div className="flex items-center space-x-1">
@@ -347,57 +361,6 @@ const ShowDetails: React.FC = () => {
               )}
             </div>
           )}
-        </div>
-      </section>
-
-      {/* Network & Creator Info */}
-      <section className="py-16 bg-white">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Networks */}
-            {show.networks.length > 0 && (
-              <div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-4">Networks</h3>
-                <div className="space-y-3">
-                  {show.networks.map((network) => (
-                    <div key={network.id} className="flex items-center space-x-3">
-                      <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                        <span className="text-gray-600 font-semibold text-sm">
-                          {network.name.slice(0, 2).toUpperCase()}
-                        </span>
-                      </div>
-                      <div>
-                        <div className="font-semibold text-gray-900">{network.name}</div>
-                        <div className="text-sm text-gray-500">{network.origin_country}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            {/* Creators */}
-            {show.created_by.length > 0 && (
-              <div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-4">Created By</h3>
-                <div className="space-y-3">
-                  {show.created_by.map((creator) => (
-                    <div key={creator.id} className="flex items-center space-x-3">
-                      <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                        <span className="text-white font-semibold">
-                          {creator.name.split(' ').map(n => n[0]).join('')}
-                        </span>
-                      </div>
-                      <div>
-                        <div className="font-semibold text-gray-900">{creator.name}</div>
-                        <div className="text-sm text-gray-500">Creator</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
         </div>
       </section>
     </div>

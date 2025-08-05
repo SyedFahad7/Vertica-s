@@ -4,6 +4,7 @@ import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import ShowDetails from './pages/ShowDetails';
 import Search from './pages/Search';
+import Watchlist from './pages/Watchlist';
 import { Show } from './types';
 
 function App() {
@@ -65,12 +66,16 @@ function App() {
             element={<Home />} 
           />
           <Route 
-            path="/show/:id" 
+            path="/show/:slug" 
             element={<ShowDetails />} 
           />
           <Route 
             path="/search" 
             element={<Search />} 
+          />
+          <Route 
+            path="/watchlist" 
+            element={<Watchlist />} 
           />
         </Routes>
       </div>
