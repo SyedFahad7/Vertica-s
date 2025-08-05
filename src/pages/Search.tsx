@@ -14,6 +14,8 @@ const Search: React.FC = () => {
   const [sortBy, setSortBy] = useState('popularity');
   const [showFilters, setShowFilters] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [recommendations, setRecommendations] = useState<Show[]>([]);
+  const [popular, setPopular] = useState<Show[]>([]);
 
   // Keep URL in sync with searchQuery
   useEffect(() => {
@@ -25,10 +27,7 @@ const Search: React.FC = () => {
   }, [searchQuery, setSearchParams]);
 
   useEffect(() => {
-    if (!searchQuery.trim()) {
-      setShows([]);
-      return;
-    }
+    if (!searchQuery.trim()) return;
     const delayDebounce = setTimeout(() => {
       const fetchSearch = async () => {
         setLoading(true);
@@ -74,6 +73,48 @@ const Search: React.FC = () => {
       fetchSearch();
     }, 400);
     return () => clearTimeout(delayDebounce);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    if (searchQuery.trim()) return;
+    // Watchlist
+    const list = JSON.parse(localStorage.getItem('watchlist') || '[]');
+    setRecommendations(list);
+    // Always fetch popular
+    (async () => {
+      setLoading(true);
+      try {
+        const apiKey = import.meta.env.VITE_TMDB_API_KEY;
+        const res = await fetch(`https://api.themoviedb.org/3/tv/popular?api_key=${apiKey}`);
+        const data = await res.json();
+        const shows: Show[] = (data.results || []).map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          overview: item.overview,
+          first_air_date: item.first_air_date,
+          poster_path: item.poster_path,
+          backdrop_path: item.backdrop_path,
+          vote_average: item.vote_average,
+          vote_count: item.vote_count,
+          popularity: item.popularity,
+          genre_ids: item.genre_ids || [],
+          origin_country: item.origin_country || [],
+          original_language: item.original_language,
+          original_name: item.original_name,
+          seasons: [],
+          status: '',
+          number_of_episodes: 0,
+          number_of_seasons: 0,
+          networks: [],
+          created_by: [],
+        }));
+        setPopular(shows);
+      } catch {
+        setPopular([]);
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [searchQuery]);
 
   const filteredAndSortedShows = useMemo(() => {
@@ -171,7 +212,7 @@ const Search: React.FC = () => {
           <div className="flex justify-center py-16">
             <SearchIcon className="animate-spin h-12 w-12 text-blue-500" />
           </div>
-        ) : filteredAndSortedShows.length === 0 ? (
+        ) : filteredAndSortedShows.length === 0 && !searchQuery.trim() && recommendations.length === 0 ? (
           <div className="text-center py-16">
             <div className="text-gray-400 mb-4">
               <SearchIcon className="h-16 w-16 mx-auto" />
@@ -182,11 +223,35 @@ const Search: React.FC = () => {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-16">
-            {filteredAndSortedShows.map((show) => (
-              <ShowCard key={show.id} show={show} />
-            ))}
-          </div>
+          <>
+            {(!searchQuery.trim() && recommendations.length > 0) && (
+              <div className="mb-12">
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">Related to your Watchlist</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-8">
+                  {recommendations.map((show) => (
+                    <ShowCard key={show.id} show={show} />
+                  ))}
+                </div>
+              </div>
+            )}
+            {(!searchQuery.trim() && popular.length > 0) && (
+              <div className="mb-12">
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">Popular TV Shows</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-8">
+                  {popular.map((show) => (
+                    <ShowCard key={show.id} show={show} />
+                  ))}
+                </div>
+              </div>
+            )}
+            {searchQuery.trim() && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-16">
+                {filteredAndSortedShows.map((show) => (
+                  <ShowCard key={show.id} show={show} />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
